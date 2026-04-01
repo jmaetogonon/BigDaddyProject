@@ -1,0 +1,165 @@
+﻿@page "/users"
+@attribute [Authorize(Roles = "SystemAdministrator,Manager")]
+@using BigDaddyProject.Application.Common
+@using BigDaddyProject.Application.DTOs
+@using BigDaddyProject.Application.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@inject IUserService UserService
+@inject NavigationManager Nav
+
+<PageTitle>Users – BigDaddy</PageTitle>
+
+<div class="bd-page-header">
+    <div>
+        <h4 class="bd-page-title"><i class="bi bi-people me-2"></i>Users</h4>
+        <span class="bd-page-sub">Manage system users</span>
+    </div>
+    <a href="/users/create" class="bd-btn-primary">
+        <i class="bi bi-plus-lg"></i> New User
+    </a>
+</div>
+
+<div class="bd-card">
+    <div class="bd-card-header">
+        <div class="bd-search-row">
+            <div class="bd-search-input-wrap">
+                <i class="bi bi-search"></i>
+                <input type="text" class="bd-input bd-search-input"
+                       placeholder="Search name or email..."
+                       @oninput="OnSearch" />
+            </div>
+            <select class="bd-input bd-select" @bind="_statusFilter" @bind:after="LoadUsers">
+                <option value="">All Status</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+            </select>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="bd-loading"><span class="bd-spinner-lg"></span></div>
+    }
+    else if (_result != null)
+    {
+        <div class="bd-table-wrap">
+            <table class="bd-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Teams</th>
+                        <th>Roles</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in _result.Items)
+                    {
+                        <tr>
+                            <td class="bd-fw">@user.Name</td>
+                            <td class="bd-muted">@user.Email</td>
+                            <td>
+                                @foreach (var t in user.Teams.Take(2))
+                                {
+                                    <span class="bd-tag">@t</span>
+                                }
+                                @if (user.Teams.Count > 2)
+                                {
+                                    <span class="bd-tag-more">+@(user.Teams.Count - 2)</span>
+                                }
+                            </td>
+                            <td>
+                                @foreach (var r in user.Roles.Take(2))
+                                {
+                                    <span class="bd-tag bd-tag-yellow">@r</span>
+                                }
+                            </td>
+                            <td>
+                                <span class="bd-status @(user.Status == "Active" ? "bd-status-active" : "bd-status-inactive")">
+                                    @user.Status
+                                </span>
+                            </td>
+                            <td class="bd-muted">@user.CreatedAt.ToString("MMM dd, yyyy")</td>
+                            <td class="text-end">
+                                <a href="/users/@user.Id" class="bd-btn-icon" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <button class="bd-btn-icon @(user.Status == "Active" ? "bd-btn-danger" : "bd-btn-success")"
+                                        @onclick="() => ToggleStatus(user)"
+                                        title="@(user.Status == "Active" ? "Deactivate" : "Activate")">
+                                    <i class="bi @(user.Status == "Active" ? "bi-person-x" : "bi-person-check")"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="bd-pagination">
+            <span class="bd-muted">
+                Showing @_result.Items.Count of @_result.TotalCount users
+            </span>
+            <div class="bd-page-buttons">
+                <button class="bd-btn-page" disabled="@(_page == 1)" @onclick="() => GoTo(_page - 1)">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                @for (int i = 1; i <= _result.TotalPages; i++)
+                {
+                    var p = i;
+                    <button class="bd-btn-page @(_page == p ? "bd-btn-page-active" : "")"
+                            @onclick="() => GoTo(p)">
+                        @p
+                    </button>
+                }
+                <button class="bd-btn-page" disabled="@(_page == _result.TotalPages)"
+                        @onclick="() => GoTo(_page + 1)">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private PagedResult<UserListDto>? _result;
+    private bool _loading = true;
+    private string _search = string.Empty;
+    private string _statusFilter = string.Empty;
+    private int _page = 1;
+    private const int PageSize = 20;
+    private System.Threading.Timer? _debounce;
+
+    protected override async Task OnInitializedAsync() => await LoadUsers();
+
+    private void OnSearch(ChangeEventArgs e)
+    {
+        _search = e.Value?.ToString() ?? string.Empty;
+        _debounce?.Dispose();
+        _debounce = new System.Threading.Timer(async _ =>
+        {
+            _page = 1;
+            await InvokeAsync(LoadUsers);
+        }, null, 400, System.Threading.Timeout.Infinite);
+    }
+
+    private async Task LoadUsers()
+    {
+        _loading = true;
+        StateHasChanged();
+        _result = await UserService.GetUsersAsync(_page, PageSize, _search, _statusFilter);
+        _loading = false;
+    }
+
+    private async Task GoTo(int page) { _page = page; await LoadUsers(); }
+
+    private async Task ToggleStatus(UserListDto user)
+    {
+        var newStatus = user.Status == "Active" ? "Inactive" : "Active";
+        await UserService.SetStatusAsync(user.Id, newStatus);
+        await LoadUsers();
+    }
+}

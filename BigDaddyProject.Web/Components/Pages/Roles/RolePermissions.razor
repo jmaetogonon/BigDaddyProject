@@ -1,0 +1,113 @@
+﻿@page "/roles/{RoleId:int}/permissions"
+@attribute [Authorize(Roles = "SystemAdministrator")]
+@using BigDaddyProject.Application.DTOs
+@using BigDaddyProject.Application.Interfaces
+@using BigDaddyProject.Infrastructure.Data
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+ @inject IRoleService RoleService
+@inject ApplicationDbContext Db
+@inject NavigationManager Nav
+
+<PageTitle>Role Permissions – BigDaddy</PageTitle>
+
+@if (_role != null)
+{
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold mb-0">
+                <i class="bi bi-shield-lock me-2 text-warning"></i>@_role.Name
+            </h4>
+            <small class="text-muted">Assign permissions to this role</small>
+        </div>
+        <button class="btn btn-warning fw-semibold" @onclick="SavePermissions" disabled="@_saving">
+            @if (_saving)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+            }
+            <i class="bi bi-save me-1"></i>Save Permissions
+        </button>
+    </div>
+
+    @foreach (var group in _permissionGroups)
+    {
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-light fw-semibold">
+                <i class="bi bi-folder me-2"></i>@group.Key
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Permission</th>
+                            <th style="width:200px">Access Level</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var perm in group.Value)
+                        {
+                            <tr>
+                                <td>@perm.Name</td>
+                                <td>
+                                    <select class="form-select form-select-sm"
+                                            @bind="_assignments[perm.Id]">
+                                        <option value="0">None</option>
+                                        <option value="1">Individual</option>
+                                        <option value="2">Organization</option>
+                                    </select>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public int RoleId { get; set; }
+
+    private RoleDetailDto? _role;
+    private Dictionary<int, int> _assignments = new();
+    private Dictionary<string, List<(int Id, string Name)>> _permissionGroups = new();
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _role = await RoleService.GetRoleByIdAsync(RoleId);
+
+        // Load all permissions grouped
+        var allPerms = await Db.Permissions
+            .OrderBy(p => p.DisplayOrder)
+            .Select(p => new { p.Id, p.Name, p.Group })
+            .ToListAsync();
+
+        _permissionGroups = allPerms
+            .GroupBy(p => p.Group)
+            .ToDictionary(g => g.Key, g => g.Select(p => (p.Id, p.Name)).ToList());
+
+        // Init all to None
+        foreach (var perm in allPerms)
+            _assignments[perm.Id] = 0;
+
+        // Apply existing
+        if (_role != null)
+            foreach (var rp in _role.Permissions)
+                _assignments[rp.PermissionId] = rp.AccessLevel;
+    }
+
+    private async Task SavePermissions()
+    {
+        _saving = true;
+        var request = new AssignPermissionsToRoleRequest(
+            _assignments
+                .Where(kvp => kvp.Value > 0)
+                .Select(kvp => new RolePermissionAssignmentDto(kvp.Key, kvp.Value))
+                .ToList());
+
+        await RoleService.AssignPermissionsAsync(RoleId, request);
+        _saving = false;
+        Nav.NavigateTo("/roles");
+    }
+}

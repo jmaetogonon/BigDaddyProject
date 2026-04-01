@@ -1,0 +1,144 @@
+﻿@page "/login"
+@page "/"
+@layout EmptyLayout
+@using BigDaddyProject.Application.DTOs
+@using BigDaddyProject.Application.Interfaces
+@using System.ComponentModel.DataAnnotations
+@inject IAuthService AuthService
+@inject NavigationManager Nav
+@inject IHttpContextAccessor HttpCtx
+
+<PageTitle>Sign In – BigDaddy</PageTitle>
+
+<div class="bd-login-bg">
+    <div class="bd-login-card">
+        <div class="bd-login-header">
+            <div class="bd-login-icon"><i class="bi bi-building-fill"></i></div>
+            <h1 class="bd-login-title">BigDaddy</h1>
+            <p class="bd-login-sub">Admin Portal</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="bd-alert bd-alert-error">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                @_error
+            </div>
+        }
+
+        <EditForm Model="_form" OnValidSubmit="HandleLogin" FormName="LoginForm">
+            <DataAnnotationsValidator />
+
+            <div class="bd-field">
+                <label class="bd-label">Email Address</label>
+                <InputText @bind-Value="_form.Email"
+                           class="bd-input"
+                           type="email"
+                           placeholder="admin@example.com"
+                           autocomplete="email" />
+                <ValidationMessage For="() => _form.Email" class="bd-field-error" />
+            </div>
+
+            <div class="bd-field">
+                <label class="bd-label">Password</label>
+                <InputText @bind-Value="_form.Password"
+                           class="bd-input"
+                           type="password"
+                           placeholder="••••••••"
+                           autocomplete="current-password" />
+                <ValidationMessage For="() => _form.Password" class="bd-field-error" />
+            </div>
+
+            <button type="submit" class="bd-btn-primary" disabled="@_loading">
+                @if (_loading)
+                {
+                    <span class="bd-spinner"></span>
+                }
+                Sign In
+            </button>
+
+            <div class="bd-login-footer-link">
+                <a href="/forgot-password">Forgot your password?</a>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private LoginFormModel _form { get; set; } = new();
+    private string _error = string.Empty;
+    private bool _loading;
+
+    // If already authenticated, skip to dashboard
+    protected override void OnInitialized()
+    {
+        if (HttpCtx.HttpContext?.User?.Identity?.IsAuthenticated == true)
+            Nav.NavigateTo("/dashboard", forceLoad: true);
+    }
+
+    private async Task HandleLogin()
+    {
+        _loading = true;
+        _error = string.Empty;
+
+        try
+        {
+            var ip = HttpCtx.HttpContext?.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var result = await AuthService.LoginAsync(
+                new LoginRequest(_form.Email, _form.Password), ip);
+
+            if (result.Success && result.Data != null)
+            {
+                var expiresAt = result.Data.ExpiresAt;
+
+                var accessOpts = new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                    Expires = expiresAt,
+                    Path = "/"
+                };
+
+                var refreshOpts = new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                    Expires = DateTimeOffset.UtcNow.AddDays(7),
+                    Path = "/"
+                };
+
+                HttpCtx.HttpContext!.Response.Cookies.Append(
+                    "bdp_access_token", result.Data.AccessToken, accessOpts);
+                HttpCtx.HttpContext!.Response.Cookies.Append(
+                    "bdp_refresh_token", result.Data.RefreshToken, refreshOpts);
+
+                Nav.NavigateTo("/dashboard", forceLoad: true);
+            }
+            else
+            {
+                _error = result.ErrorMessage ?? "Login failed. Please try again.";
+            }
+        }
+        catch
+        {
+            _error = "An unexpected error occurred. Please try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private class LoginFormModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}

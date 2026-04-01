@@ -1,0 +1,96 @@
+﻿@page "/dashboard"
+@attribute [Authorize]
+@using BigDaddyProject.Domain.Entities.Identity
+@using BigDaddyProject.Infrastructure.Data
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+
+<PageTitle>Dashboard – BigDaddy</PageTitle>
+
+<div class="bd-page-header">
+    <h4 class="bd-page-title">Dashboard</h4>
+    <span class="bd-page-sub">System overview</span>
+</div>
+
+<div class="bd-stats-grid">
+    <div class="bd-stat-card">
+        <div class="bd-stat-icon bd-icon-yellow"><i class="bi bi-people-fill"></i></div>
+        <div>
+            <div class="bd-stat-value">@_totalUsers</div>
+            <div class="bd-stat-label">Total Users</div>
+        </div>
+    </div>
+    <div class="bd-stat-card">
+        <div class="bd-stat-icon bd-icon-green"><i class="bi bi-person-check-fill"></i></div>
+        <div>
+            <div class="bd-stat-value">@_activeUsers</div>
+            <div class="bd-stat-label">Active Users</div>
+        </div>
+    </div>
+    <div class="bd-stat-card">
+        <div class="bd-stat-icon bd-icon-blue"><i class="bi bi-diagram-3-fill"></i></div>
+        <div>
+            <div class="bd-stat-value">@_teams</div>
+            <div class="bd-stat-label">Teams</div>
+        </div>
+    </div>
+    <div class="bd-stat-card">
+        <div class="bd-stat-icon bd-icon-red"><i class="bi bi-shield-lock-fill"></i></div>
+        <div>
+            <div class="bd-stat-value">@_roles</div>
+            <div class="bd-stat-label">Roles</div>
+        </div>
+    </div>
+</div>
+
+<div class="bd-card mt-4">
+    <div class="bd-card-header">
+        <i class="bi bi-clock-history me-2"></i>Recent Audit Activity
+    </div>
+    <div class="bd-table-wrap">
+        <table class="bd-table">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Details</th>
+                    <th>IP</th>
+                    <th>Time (UTC)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var log in _logs)
+                {
+                    <tr>
+                        <td>@(log.User?.Email ?? "–")</td>
+                        <td><span class="bd-badge">@log.Operation</span></td>
+                        <td class="bd-muted">@log.Details</td>
+                        <td class="bd-muted">@(log.IpAddress ?? "–")</td>
+                        <td class="bd-muted">@log.CreatedAt.ToString("MMM dd HH:mm")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private int _totalUsers, _activeUsers, _teams, _roles;
+    private List<UserAuditLog> _logs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _totalUsers = await Db.Users.CountAsync();
+        _activeUsers = await Db.Users.CountAsync(u => u.Status == "Active");
+        _teams = await Db.Teams.CountAsync();
+        _roles = await Db.Roles.CountAsync();
+
+        _logs = await Db.UserAuditLogs
+            .AsNoTracking()
+            .Include(l => l.User)
+            .OrderByDescending(l => l.CreatedAt)
+            .Take(15)
+            .ToListAsync();
+    }
+}

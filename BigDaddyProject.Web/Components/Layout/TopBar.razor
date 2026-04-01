@@ -1,0 +1,21 @@
+﻿@using System.Security.Claims
+@inject IHttpContextAccessor HttpCtx
+
+<header class="bd-topbar">
+    <div class="bd-topbar-left">
+        <span class="bd-topbar-title">BigDaddy Admin Portal</span>
+    </div>
+    <div class="bd-topbar-right">
+        <div class="bd-user-chip">
+            <i class="bi bi-person-circle"></i>
+            <span>@UserName</span>
+        </div>
+    </div>
+</header>
+
+@code {
+    private string UserName =>
+        HttpCtx.HttpContext?.User?.FindFirstValue("name")
+        ?? HttpCtx.HttpContext?.User?.FindFirstValue(ClaimTypes.Email)
+        ?? "Unknown";
+}

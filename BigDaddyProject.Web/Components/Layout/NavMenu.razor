@@ -1,0 +1,81 @@
+﻿@* <div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">BigDaddyProject.Web</a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="counter">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="weather">
+                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+ *@
+
+<nav class="bd-sidebar">
+    <div class="bd-sidebar-brand">
+        <span class="bd-logo-icon"><i class="bi bi-building-fill"></i></span>
+        <div>
+            <div class="bd-logo-title">BigDaddy</div>
+            <div class="bd-logo-sub">Admin Portal</div>
+        </div>
+    </div>
+
+    <ul class="bd-nav">
+        <li>
+            <NavLink class="bd-nav-link" href="/dashboard" Match="NavLinkMatch.All">
+                <i class="bi bi-speedometer2"></i><span>Dashboard</span>
+            </NavLink>
+        </li>
+
+        <li class="bd-nav-section">USER MANAGEMENT</li>
+        <li>
+            <NavLink class="bd-nav-link" href="/users">
+                <i class="bi bi-people"></i><span>Users</span>
+            </NavLink>
+        </li>
+        <li>
+            <NavLink class="bd-nav-link" href="/teams">
+                <i class="bi bi-diagram-3"></i><span>Teams</span>
+            </NavLink>
+        </li>
+
+        <li class="bd-nav-section">ACCESS CONTROL</li>
+        <li>
+            <NavLink class="bd-nav-link" href="/roles">
+                <i class="bi bi-shield-lock"></i><span>Roles</span>
+            </NavLink>
+        </li>
+        <li>
+            <NavLink class="bd-nav-link" href="/permissions">
+                <i class="bi bi-key"></i><span>Permissions</span>
+            </NavLink>
+        </li>
+    </ul>
+
+    <div class="bd-sidebar-footer">
+        @*  FIXED LOGOUT: plain anchor → GET /api/auth/web-logout → clears cookies → redirect /login  *@
+        <a href="/api/auth/web-logout" class="bd-logout-btn">
+            <i class="bi bi-box-arrow-left"></i>
+            <span>Logout</span>
+        </a>
+    </div>
+</nav>
